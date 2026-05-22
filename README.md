@@ -170,7 +170,7 @@ The picker saves to `bench.config.json`. You can also edit it directly:
   "iterations": 3,
   "warmup":     1,
   "timeout_s":  900,
-  "no_output_timeout_s": 120,
+  "no_output_timeout_s": 360,
   "prompt":     "Build a single-page website..."
 }
 ```
@@ -187,7 +187,7 @@ The picker saves to `bench.config.json`. You can also edit it directly:
 | `iterations` | Timed runs per combination. |
 | `warmup` | Untimed runs per combination executed first — hides cold model-load latency. |
 | `timeout_s` | Maximum wall-clock seconds for one run. Defaults to `900`. |
-| `no_output_timeout_s` | Maximum seconds an agent subprocess may run without producing stdout before it is killed. Defaults to `min(120, timeout_s)`. |
+| `no_output_timeout_s` | Maximum seconds an agent subprocess may run without producing stdout before it is killed. Defaults to `min(360, timeout_s)`. |
 | `prompt` | Prompt sent to every run. Change this to benchmark different task types. |
 
 The script expands the cartesian product `agents × backends × models` and skips invalid combinations (unsupported backend for an agent, missing model alias) with a warning.
@@ -250,7 +250,7 @@ Then add `"myagent"` to `agents` in the config (or pick it in the interactive pi
 - **LM Studio model not found / API rejects the model ID.** LM Studio's API model IDs don't always match the HuggingFace repo name. Run `curl -s http://127.0.0.1:1234/v1/models` to see exact IDs the running server accepts, then update `lmstudio` in `bench.config.json` to match.
 - **LM Studio first-time setup.** On a fresh machine the `lms` daemon may not be initialized. The script detects this and opens LM Studio.app once to finish setup, then quits it automatically.
 - **oMLX model not found.** The bench downloads oMLX models from HuggingFace using `omlx_hf`. If download fails, check that `HF_TOKEN` is set in `.env` or your shell, or verify the repo ID is correct. `curl -s http://localhost:8000/v1/models` shows what the running server has loaded.
-- **oMLX exits with memory errors or hangs before output.** Before running oMLX agent combinations, the bench now asks oMLX for a one-token response so pinned-model or load failures are recorded as `preflight_failed` instead of spending every iteration on the full timeout. Agent subprocesses also stop after `no_output_timeout_s` seconds without stdout.
+- **oMLX exits with memory errors or hangs before output.** Before running oMLX agent combinations, the bench stops other model backends, restarts the oMLX server to clear stale pinned models, and asks oMLX for a one-token response. Any remaining load failure is recorded as `preflight_failed` instead of spending every iteration on the full timeout. Agent subprocesses also stop after `no_output_timeout_s` seconds without stdout.
 - **LM Studio / oMLX not available on Intel Mac.** Both require Apple Silicon. The script detects the architecture and skips those backends automatically on Intel hardware.
 - **Config validation errors (exit code 2).** Before any install or backend startup the script validates the config and reports all errors at once. Common issues: missing `models`, `agents`, or `backends` fields; unknown agent or backend names; zero or negative `iterations`; duplicate model `id` values. Fix the reported issues in `bench.config.json` and re-run.
 - **`direct` agent only supports Ollama.** The `direct` pseudo-agent hits the backend's HTTP API to measure pure model speed without agent overhead. Currently only Ollama's `/api/generate` endpoint is supported because it returns precise token-level timing stats. LM Studio and oMLX direct modes are planned but not yet implemented.

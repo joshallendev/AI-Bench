@@ -249,14 +249,9 @@ class OMLX:
 
     @classmethod
     def start(cls):
-        # If we already own a running server, stop it so it restarts pointing at
-        # the current model-dir (a stale server may have started before models
-        # downloaded). If something *else* holds the port, trust it — we can't
-        # safely kill it, and trying to start a duplicate would fail to bind.
+        # Restart any running server so stale pinned models from a previous
+        # session do not starve the benchmarked model.
         if cls.is_up():
-            if cls.proc is None:
-                log("oMLX server already running (not started by us) — using existing instance.")
-                return
             cls.stop()
             time.sleep(1)
         omlx_bin = str(OMLX_BIN) if OMLX_BIN.exists() else which("omlx")
@@ -285,3 +280,5 @@ class OMLX:
             except subprocess.TimeoutExpired:
                 cls.proc.kill()
             cls.proc = None
+        run(["pkill", "-f", "omlx serve"], check=False)
+        time.sleep(2)

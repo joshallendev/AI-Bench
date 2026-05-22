@@ -95,6 +95,12 @@ def _preflight_failure_result(label, run_dir, n_iter, reason, validators=None):
     return summarize(label, iters)
 
 
+def _stop_other_backends(target_backend):
+    for backend, stop in BACKEND_STOP.items():
+        if backend != target_backend:
+            stop()
+
+
 def _launch_viewer(viewer_path, opener=webbrowser.open):
     """Open the generated static viewer in the user's default browser."""
     viewer_url = Path(viewer_path).resolve().as_uri()
@@ -347,7 +353,7 @@ def main():
         prompt = cfg["prompt"]
         n_iter, warmup = cfg["iterations"], cfg["warmup"]
         timeout_s = cfg.get("timeout_s", 900)
-        no_output_timeout_s = cfg.get("no_output_timeout_s", min(120, timeout_s))
+        no_output_timeout_s = cfg.get("no_output_timeout_s", min(360, timeout_s))
         combos = []
         skipped = []
 
@@ -422,6 +428,8 @@ def main():
                     BACKEND_STOP[current_backend]()
                     ctx.backend_stop(current_backend)
                     time.sleep(2)
+                log(f"Stopping other model backends before {p['backend']}…")
+                _stop_other_backends(p["backend"])
                 log(f"Starting {p['backend']} backend…")
                 BACKEND_START[p["backend"]]()
                 ctx.backend_start(p["backend"])
