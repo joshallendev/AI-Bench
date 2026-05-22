@@ -81,6 +81,11 @@ class Ollama:
             except subprocess.TimeoutExpired:
                 cls.proc.kill()
             cls.proc = None
+        # Force ollama to unload all models from GPU memory so the next backend
+        # (e.g. oMLX) has room. Ollama pins models and won't free them until
+        # the keep-alive expires (default 5 min). Setting it to 0 forces immediate unload.
+        run(["pkill", "-f", "ollama.serve"], check=False)
+        time.sleep(2)
 
 
 class LMStudio:
