@@ -104,6 +104,12 @@ Pin a specific config file (bypasses the picker entirely):
 python3 bench.py --config bench.config.json
 ```
 
+Skip automatically opening the results viewer when the benchmark finishes:
+
+```bash
+python3 bench.py --no-open-viewer
+```
+
 Uninstall everything the script added:
 
 ```bash
@@ -203,7 +209,7 @@ python3 bench.py
 open results/<timestamp>/viewer.html
 ```
 
-Each run writes a copy of `viewer.html` into its results directory with that run's `results.json` preloaded. Open the run-local viewer to inspect the result immediately. You can still drop additional `results.json` files into the page, or click to choose them, to compare runs side-by-side. The viewer renders:
+Each run writes a copy of `viewer.html` into its results directory with that run's `results.json` preloaded, then automatically opens it in your default browser when the benchmark finishes. You can still open the run-local viewer manually, drop additional `results.json` files into the page, or click to choose them, to compare runs side-by-side. The viewer renders:
 
 - A summary table with `agent / backend / model` columns and ★ winners per metric.
 - Per-iteration detail tables.

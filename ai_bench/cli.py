@@ -7,6 +7,7 @@ import platform
 import subprocess
 import sys
 import time
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -64,6 +65,21 @@ def _write_run_viewer(root, run_dir, results):
         html = html.replace(marker, embedded, 1)
     viewer_dst.write_text(html)
     return viewer_dst
+
+
+def _launch_viewer(viewer_path, opener=webbrowser.open):
+    """Open the generated static viewer in the user's default browser."""
+    viewer_url = Path(viewer_path).resolve().as_uri()
+    try:
+        opened = opener(viewer_url)
+    except Exception as exc:
+        warn(f"Could not launch viewer automatically: {exc}")
+        return False
+    if not opened:
+        warn(f"Could not launch viewer automatically. Open manually: {viewer_path}")
+        return False
+    log(f"Launched viewer: {viewer_path}")
+    return True
 
 
 # ---- lifecycle context -------------------------------------------------------
@@ -131,6 +147,8 @@ def main():
                     help="Open the interactive model picker even if a config already exists")
     ap.add_argument("--skip-install", action="store_true")
     ap.add_argument("--cleanup-only", action="store_true")
+    ap.add_argument("--no-open-viewer", action="store_true",
+                    help="Do not automatically open the run-local results viewer when the benchmark finishes")
     args = ap.parse_args()
 
     default_cfg_path = ROOT / "bench.config.json"
@@ -437,6 +455,9 @@ def main():
                 f"{str(s.get('all_runs_html','–')):>6} "
                 f"{str(s.get('all_runs_have_buttons','–')):>6}"
             )
+
+        if not args.no_open_viewer:
+            _launch_viewer(run_viewer)
 
         ctx.restore()
 

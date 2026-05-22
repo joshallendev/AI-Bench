@@ -19,7 +19,7 @@ Default flow:
 
 Usage:
   python3 bench.py [--config bench.config.json] [--skip-install]
-                   [--cleanup-only]
+                   [--cleanup-only] [--no-open-viewer]
 """
 
 import sys
