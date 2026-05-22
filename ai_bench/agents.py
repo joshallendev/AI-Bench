@@ -120,10 +120,11 @@ def write_opencode_config(ollama_models, lmstudio_models, omlx_models):
             "models": {m: {"name": m} for m in lmstudio_models},
         }
     if omlx_models:
+        omlx_key = OMLX.get_api_key() or "omlx"
         providers["omlx"] = {
             "npm": "@ai-sdk/openai-compatible",
             "name": "oMLX",
-            "options": {"baseURL": "http://localhost:8000/v1"},
+            "options": {"baseURL": "http://localhost:8000/v1", "apiKey": omlx_key},
             "models": {m: {"name": m} for m in omlx_models},
         }
     cfg = {"$schema": "https://opencode.ai/config.json", "provider": providers}
