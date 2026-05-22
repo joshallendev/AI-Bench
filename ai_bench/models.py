@@ -9,6 +9,7 @@ import os
 import platform
 import re
 import shutil
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -24,6 +25,8 @@ IS_ARM64 = platform.machine() in ("arm64", "aarch64")
 LMSTUDIO_SUPPORTED = IS_MAC and IS_ARM64
 OMLX_SUPPORTED = IS_MAC and IS_ARM64
 OMLX_VENV_DIR = Path.home() / ".local" / "share" / "omlx-venv"
+OMLX_SETTINGS = Path.home() / ".omlx" / "settings.json"
+OMLX_MODEL_SETTINGS = Path.home() / ".omlx" / "model_settings.json"
 
 
 def have_omlx():
@@ -117,12 +120,55 @@ def _lmstudio_resolve_api_id(hf_path):
 
 def have_omlx_model(name):
     """Check if oMLX model is fully downloaded (has weight files on disk)."""
-    if not have_omlx():
+    return _find_omlx_model_dir(name) is not None
+
+
+def _omlx_model_dirs():
+    """Return model roots oMLX is configured to scan."""
+    dirs = []
+    try:
+        settings = json.loads(OMLX_SETTINGS.read_text())
+        model_cfg = settings.get("model") or {}
+        for raw in model_cfg.get("model_dirs") or []:
+            if raw:
+                dirs.append(Path(raw).expanduser())
+        if model_cfg.get("model_dir"):
+            dirs.append(Path(model_cfg["model_dir"]).expanduser())
+    except Exception:
+        pass
+    dirs.append(OMLX_MODEL_DIR)
+
+    seen = set()
+    unique = []
+    for d in dirs:
+        key = str(d)
+        if key not in seen:
+            seen.add(key)
+            unique.append(d)
+    return unique
+
+
+def _dir_has_model_weights(path):
+    if not path.exists() or not path.is_dir():
         return False
-    model_path = OMLX_MODEL_DIR / name
-    if not model_path.exists():
-        return False
-    return any(model_path.glob("*.safetensors")) or any(model_path.glob("*.gguf"))
+    return any(path.glob("*.safetensors")) or any(path.glob("*.gguf"))
+
+
+def _find_omlx_model_dir(name):
+    """Find a model by exact directory name or configured model-settings key."""
+    candidates = []
+    for root in _omlx_model_dirs():
+        candidates.append(root / name)
+        if "/" in name:
+            candidates.append(root / name.replace("/", os.sep))
+        if root.exists():
+            candidates.extend(d for d in root.glob(f"*/{name}") if d.is_dir())
+
+    for candidate in candidates:
+        if _dir_has_model_weights(candidate):
+            return candidate
+
+    return None
 
 
 def _hf_get_chat_template(hf_repo, headers):
@@ -219,6 +265,23 @@ def _fmt_size(size_bytes):
     return f"{gb:.1f} GB" if gb >= 1 else f"{size_bytes / 1e6:.0f} MB"
 
 
+def _read_url_text(url, *, timeout=6):
+    """Fetch text, retrying with an unverified context for local Python CA gaps."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", errors="ignore")
+    except urllib.error.URLError as e:
+        reason = getattr(e, "reason", None)
+        if not isinstance(reason, ssl.SSLError):
+            raise
+        # Some Python installs on macOS do not have a usable CA bundle. This is
+        # only used for public model discovery; downloads still use their own tools.
+        ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+            return r.read().decode("utf-8", errors="ignore")
+
+
 def _list_ollama_installed():
     """Return locally pulled Ollama models by reading manifests directly.
 
@@ -247,25 +310,14 @@ def _list_ollama_installed():
 
 
 def _search_ollama(term):
-    """Search Ollama by scraping the library page for all tag variants + sizes.
-
-    Heuristic: the first whitespace-separated word is the family slug. Try it
-    verbatim first; if that returns nothing and the term has multiple words,
-    retry with the first two words concatenated (handles "llama 3" → "llama3").
-    Any remaining words are treated as a substring filter on the tag.
-    """
+    """Search Ollama and return tag variants + sizes."""
     parts = term.lower().strip().replace("_", "-").split()
     if not parts:
         return []
 
     def _fetch(family, tag_filter=""):
         try:
-            req = urllib.request.Request(
-                f"https://ollama.com/library/{family}",
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            with urllib.request.urlopen(req, timeout=6) as r:
-                html = r.read().decode("utf-8", errors="ignore")
+            html = _read_url_text(f"https://ollama.com/library/{family}", timeout=6)
             tag_pat = re.compile(rf'{re.escape(family)}:[a-zA-Z0-9._-]+')
             size_pat = re.compile(r'(\d+\.?\d*)\s*(GB|MB)')
             seen = {}
@@ -283,13 +335,46 @@ def _search_ollama(term):
         except Exception:
             return []
 
+    def _families_from_search(query):
+        families = []
+        seen = set()
+        try:
+            html = _read_url_text(
+                f"https://ollama.com/library?{urllib.parse.urlencode({'q': query})}",
+                timeout=6,
+            )
+        except Exception:
+            return families
+
+        patterns = [
+            r'href="/library/([a-zA-Z0-9._-]+)"',
+            r'/library/([a-zA-Z0-9._-]+)',
+        ]
+        for pat in patterns:
+            for m in re.finditer(pat, html):
+                family = urllib.parse.unquote(m.group(1)).split(":", 1)[0].lower()
+                if family and query in family and family not in seen:
+                    seen.add(family)
+                    families.append(family)
+        return families
+
     first_results = _fetch(parts[0], " ".join(parts[1:]))
     if first_results:
         return first_results
     if len(parts) >= 2:
         joined = parts[0] + parts[1]
-        return _fetch(joined, " ".join(parts[2:]))
-    return []
+        joined_results = _fetch(joined, " ".join(parts[2:]))
+        if joined_results:
+            return joined_results
+
+    results = []
+    seen_ids = set()
+    for family in _families_from_search(parts[0])[:8]:
+        for item in _fetch(family, " ".join(parts[1:])):
+            if item["id"] not in seen_ids:
+                seen_ids.add(item["id"])
+                results.append(item)
+    return results
 
 
 def _list_lmstudio_installed():
@@ -405,18 +490,45 @@ def _search_lmstudio_online(term):
 
 
 def _list_omlx_installed():
-    """Return locally downloaded oMLX models from OMLX_MODEL_DIR."""
-    if not OMLX_MODEL_DIR.exists():
-        return []
+    """Return locally downloaded oMLX models from configured oMLX model dirs."""
+    model_names = set()
+    try:
+        settings = json.loads(OMLX_MODEL_SETTINGS.read_text())
+        model_names.update((settings.get("models") or {}).keys())
+    except Exception:
+        pass
+
     results = []
-    for d in sorted(OMLX_MODEL_DIR.iterdir()):
-        if not d.is_dir():
+    seen = set()
+    for root in _omlx_model_dirs():
+        if not root.exists():
             continue
-        try:
-            size_bytes = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
-        except Exception:
-            size_bytes = None
-        results.append({"id": d.name, "size": _fmt_size(size_bytes)})
+        for d in sorted(root.glob("*")) + sorted(root.glob("*/*")):
+            if not d.is_dir() or not _dir_has_model_weights(d):
+                continue
+            model_id = d.name
+            if model_names and model_id not in model_names:
+                # oMLX names models by leaf directory in model_settings.json;
+                # keep filesystem-only models too when no settings exist.
+                pass
+            if model_id in seen:
+                continue
+            seen.add(model_id)
+            try:
+                size_bytes = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+            except Exception:
+                size_bytes = None
+            desc = str(root)
+            results.append({"id": model_id, "size": _fmt_size(size_bytes), "desc": desc})
+
+    for model_id in sorted(model_names - seen):
+        d = _find_omlx_model_dir(model_id)
+        if d:
+            try:
+                size_bytes = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+            except Exception:
+                size_bytes = None
+            results.append({"id": model_id, "size": _fmt_size(size_bytes), "desc": str(d.parent)})
     return results
 
 

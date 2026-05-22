@@ -229,7 +229,7 @@ class OMLX:
         log("Starting oMLX server…")
         OMLX_MODEL_DIR.mkdir(parents=True, exist_ok=True)
         cls.proc = subprocess.Popen(
-            [omlx_bin, "serve", "--model-dir", str(OMLX_MODEL_DIR)],
+            [omlx_bin, "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
