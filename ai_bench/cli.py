@@ -67,6 +67,34 @@ def _write_run_viewer(root, run_dir, results):
     return viewer_dst
 
 
+def _preflight_failure_result(label, run_dir, n_iter, reason, validators=None):
+    """Build a combo result when a backend/model preflight fails before warmup."""
+    stderr_path = run_dir / f"{label}__preflight.stderr.log"
+    stderr_path.write_text(reason)
+    validators_cfg = validators or {}
+    iters = []
+    for i in range(n_iter):
+        out_path = run_dir / f"{label}__iter-{i}.txt"
+        out_path.write_text("")
+        iters.append({
+            "iter": i,
+            "wall_s": 0.0,
+            "ttft_s": None,
+            "output_chars": 0,
+            "output_tokens_est": 0,
+            "throughput_tok_per_s_est": 0.0,
+            "streamed": False,
+            "rc": 1,
+            "output_file": out_path.name,
+            "stderr_file": stderr_path.name,
+            "looks_like_html": False if validators_cfg.get("html", True) else None,
+            "has_button": False if validators_cfg.get("button", True) else None,
+            "has_script": False if validators_cfg.get("script", True) else None,
+            "end_reason": "preflight_failed",
+        })
+    return summarize(label, iters)
+
+
 def _launch_viewer(viewer_path, opener=webbrowser.open):
     """Open the generated static viewer in the user's default browser."""
     viewer_url = Path(viewer_path).resolve().as_uri()
@@ -319,6 +347,7 @@ def main():
         prompt = cfg["prompt"]
         n_iter, warmup = cfg["iterations"], cfg["warmup"]
         timeout_s = cfg.get("timeout_s", 900)
+        no_output_timeout_s = cfg.get("no_output_timeout_s", min(120, timeout_s))
         combos = []
         skipped = []
 
@@ -385,6 +414,7 @@ def main():
 
         current_backend = None
         current_lmstudio_model = None
+        omlx_preflight = {}
         for p in planned:
             if p["backend"] != current_backend:
                 if current_backend is not None:
@@ -397,6 +427,31 @@ def main():
                 ctx.backend_start(p["backend"])
                 current_backend = p["backend"]
                 current_lmstudio_model = None
+
+            if p["backend"] == "omlx":
+                preflight_key = p["model_alias"]
+                if preflight_key not in omlx_preflight:
+                    log(f"Preflighting oMLX model {p['model_alias']}…")
+                    omlx_preflight[preflight_key] = OMLX.check_model_load(p["model_alias"])
+                ok, reason = omlx_preflight[preflight_key]
+                if not ok:
+                    warn(reason)
+                    if progress is not None:
+                        progress["done"] += warmup + n_iter
+                    result = _preflight_failure_result(
+                        p["label"], run_dir, n_iter, reason,
+                        validators=cfg.get("validators"),
+                    )
+                    result.update({
+                        "agent": p["agent"], "backend": p["backend"],
+                        "model_id": p["model_id"], "model_alias": p["model_alias"],
+                        "timeout_s": timeout_s,
+                        "no_output_timeout_s": no_output_timeout_s,
+                    })
+                    if p["cmd"]:
+                        result["cmd"] = p["cmd"]
+                    combos.append(result)
+                    continue
 
             if p["backend"] == "lmstudio" and p["model_alias"] != current_lmstudio_model:
                 if current_lmstudio_model is not None:
@@ -411,11 +466,13 @@ def main():
                 p["label"], p["cmd"], p["env"], run_dir, n_iter, warmup,
                 progress, direct=p.get("direct"), total_timeout=timeout_s,
                 validators=cfg.get("validators"),
+                no_output_timeout=no_output_timeout_s if p["cmd"] else None,
             )
             result.update({
                 "agent": p["agent"], "backend": p["backend"],
                 "model_id": p["model_id"], "model_alias": p["model_alias"],
                 "timeout_s": timeout_s,
+                "no_output_timeout_s": no_output_timeout_s,
             })
             if p["cmd"]:
                 result["cmd"] = p["cmd"]

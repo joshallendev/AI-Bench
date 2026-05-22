@@ -148,9 +148,16 @@ class TestValidateConfigTimeout:
     def test_valid_timeout_accepted(self):
         assert validate_config(_valid_cfg(timeout_s=300)) == []
 
+    def test_valid_no_output_timeout_accepted(self):
+        assert validate_config(_valid_cfg(no_output_timeout_s=120)) == []
+
     def test_zero_timeout_rejected(self):
         errors = validate_config(_valid_cfg(timeout_s=0))
         assert any("must be greater than 0" in e for e in errors)
+
+    def test_zero_no_output_timeout_rejected(self):
+        errors = validate_config(_valid_cfg(no_output_timeout_s=0))
+        assert any("no_output_timeout_s must be greater than 0" in e for e in errors)
 
     def test_negative_timeout_rejected(self):
         errors = validate_config(_valid_cfg(timeout_s=-1))
@@ -159,6 +166,10 @@ class TestValidateConfigTimeout:
     def test_float_timeout_rejected(self):
         errors = validate_config(_valid_cfg(timeout_s=1.5))
         assert any("must be an integer" in e for e in errors)
+
+    def test_float_no_output_timeout_rejected(self):
+        errors = validate_config(_valid_cfg(no_output_timeout_s=1.5))
+        assert any("no_output_timeout_s must be an integer" in e for e in errors)
 
 
 class TestValidateConfigValidators:

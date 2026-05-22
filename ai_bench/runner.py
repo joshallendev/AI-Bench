@@ -57,7 +57,7 @@ class Ticker:
             self._stop.wait(self.INTERVAL)
 
 
-def run_agent_streamed(cmd, env, *, total_timeout=900):
+def run_agent_streamed(cmd, env, *, total_timeout=900, no_output_timeout=None):
     """Spawn agent, stream stdout, time first→last byte and total wall.
 
     Stderr is drained on a background thread so it can't deadlock when the
@@ -78,6 +78,7 @@ def run_agent_streamed(cmd, env, *, total_timeout=900):
     first_byte_t = None
     last_byte_t = None
     timed_out = False
+    no_output_timed_out = False
     chunks = []
 
     stderr_chunks = []
@@ -99,6 +100,14 @@ def run_agent_streamed(cmd, env, *, total_timeout=900):
             if now - start > total_timeout:
                 p.kill()
                 timed_out = True
+                break
+            if (
+                no_output_timeout is not None
+                and first_byte_t is None
+                and now - start > no_output_timeout
+            ):
+                p.kill()
+                no_output_timed_out = True
                 break
             rlist, _, _ = select.select([p.stdout], [], [], 1.0)
             if not rlist:
@@ -139,7 +148,7 @@ def run_agent_streamed(cmd, env, *, total_timeout=900):
         "last_byte_s": (last_byte_t - start) if last_byte_t else None,
         "stdout": out,
         "stderr": err_out,
-        "end_reason": "timeout" if timed_out else "exit",
+        "end_reason": "no_output_timeout" if no_output_timed_out else ("timeout" if timed_out else "exit"),
     }
 
 
@@ -197,7 +206,7 @@ def run_backend_direct_ollama(model_alias, prompt, *, total_timeout=900):
 
 
 def bench_one(label, cmd, env, run_dir, n_iter, warmup, progress=None,
-              direct=None, total_timeout=900, validators=None):
+              direct=None, total_timeout=900, validators=None, no_output_timeout=None):
     """Run one combination N+warmup times and summarize.
 
     If `direct` is set, it should be a dict {backend, model_alias, prompt}
@@ -228,13 +237,19 @@ def bench_one(label, cmd, env, run_dir, n_iter, warmup, progress=None,
                               "stdout": "", "stderr": f"direct mode not supported for {direct['backend']}",
                               "end_reason": "exit", "backend_stats": None}
             else:
-                result = run_agent_streamed(cmd, env, total_timeout=total_timeout)
+                result = run_agent_streamed(
+                    cmd, env,
+                    total_timeout=total_timeout,
+                    no_output_timeout=no_output_timeout,
+                )
         if progress is not None:
             progress["done"] += 1
         out_path = run_dir / f"{label}__{tag}.txt"
         out_path.write_text(result["stdout"])
+        stderr_path = None
         if result["stderr"]:
-            (run_dir / f"{label}__{tag}.stderr.log").write_text(result["stderr"])
+            stderr_path = run_dir / f"{label}__{tag}.stderr.log"
+            stderr_path.write_text(result["stderr"])
         backend_stats = result.get("backend_stats")
         extra_log = ""
         if backend_stats and backend_stats.get("eval_tok_per_s") is not None:
@@ -267,6 +282,7 @@ def bench_one(label, cmd, env, run_dir, n_iter, warmup, progress=None,
             "streamed": streamed,
             "rc": result["rc"],
             "output_file": out_path.name,
+            "stderr_file": stderr_path.name if stderr_path else None,
             "looks_like_html": (("<html" in text) or ("<!doctype" in text)) if validators_cfg.get("html", True) else None,
             "has_button": ("<button" in text) if validators_cfg.get("button", True) else None,
             "has_script": ("<script" in text) if validators_cfg.get("script", True) else None,

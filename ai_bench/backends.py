@@ -216,6 +216,38 @@ class OMLX:
             return False
 
     @classmethod
+    def check_model_load(cls, model_alias, *, timeout=30):
+        """Ask oMLX for one token so memory/model-load failures surface early."""
+        payload = json.dumps({
+            "model": model_alias,
+            "messages": [{"role": "user", "content": "Reply with OK."}],
+            "max_tokens": 1,
+            "stream": False,
+        }).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        api_key = cls.get_api_key()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        req = urllib.request.Request(
+            "http://localhost:8000/v1/chat/completions",
+            data=payload,
+            headers=headers,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                response.read()
+            return True, ""
+        except urllib.error.HTTPError as e:
+            try:
+                body = e.read().decode("utf-8", errors="replace").strip()
+            except Exception:
+                body = ""
+            message = body or str(e)
+            return False, f"oMLX preflight failed for {model_alias}: HTTP {e.code} {message}"
+        except Exception as e:
+            return False, f"oMLX preflight failed for {model_alias}: {e}"
+
+    @classmethod
     def start(cls):
         # If we already own a running server, stop it so it restarts pointing at
         # the current model-dir (a stale server may have started before models

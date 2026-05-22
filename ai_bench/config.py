@@ -145,6 +145,13 @@ def validate_config(cfg):
         elif cfg["timeout_s"] <= 0:
             errors.append("timeout_s must be greater than 0")
 
+    # no_output_timeout_s kills silent agent subprocesses before the full timeout.
+    if "no_output_timeout_s" in cfg:
+        if not isinstance(cfg["no_output_timeout_s"], int):
+            errors.append("no_output_timeout_s must be an integer")
+        elif cfg["no_output_timeout_s"] <= 0:
+            errors.append("no_output_timeout_s must be greater than 0")
+
     # validators is optional, defaults to all true when omitted
     if "validators" in cfg:
         val = cfg["validators"]
