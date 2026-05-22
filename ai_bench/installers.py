@@ -14,6 +14,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from ai_bench.agents import (
+    restore_opencode_config,
+    restore_opencode_notools_agent,
+    restore_pi_models_config,
+)
 from ai_bench.backends import Ollama, LMStudio, OMLX, OLLAMA_MANIFESTS
 from ai_bench.log import log, warn, err
 from ai_bench.state import STATE_FILE, load_state
