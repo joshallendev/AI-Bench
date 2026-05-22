@@ -200,17 +200,17 @@ python3 bench.py
 ## The viewer
 
 ```bash
-open viewer.html
+open results/<timestamp>/viewer.html
 ```
 
-Drop a `results/<timestamp>/results.json` into the page (or click to choose). The viewer renders:
+Each run writes a copy of `viewer.html` into its results directory with that run's `results.json` preloaded. Open the run-local viewer to inspect the result immediately. You can still drop additional `results.json` files into the page, or click to choose them, to compare runs side-by-side. The viewer renders:
 
 - A summary table with `agent / backend / model` columns and ★ winners per metric.
 - Per-iteration detail tables.
 - The exact prompt and pre-flight inventory for that run.
 - Tooltips on every column header explaining what the value means.
 
-The viewer is fully static — no server, no dependencies, just open the file. It works against any `results.json` from any run, current or historical. Sortable table headers are wired for the summary and comparison views. The viewer handles both the current schema (`schema_version: 1`) and legacy results files transparently, so historical results continue to render.
+The viewer is fully static — no server, no dependencies, just open the file. The root `viewer.html` also works as an empty comparison viewer if you want to load files manually. It works against any `results.json` from any run, current or historical. Sortable table headers are wired for the summary and comparison views. The viewer handles both the current schema (`schema_version: 1`) and legacy results files transparently, so historical results continue to render.
 
 ## Adding a new agent
 

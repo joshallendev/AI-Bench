@@ -49,6 +49,23 @@ from ai_bench.state import STATE_FILE, load_state, save_state
 from ai_bench.log import err, log, warn
 
 
+def _write_run_viewer(root, run_dir, results):
+    """Copy viewer.html into a run directory with embedded initial results."""
+    viewer_src = root / "viewer.html"
+    viewer_dst = run_dir / "viewer.html"
+    marker = '<script id="embedded-results-json" type="application/json"></script>'
+    embedded = (
+        '<script id="embedded-results-json" type="application/json">'
+        + json.dumps(results).replace("</", "<\\/")
+        + "</script>"
+    )
+    html = viewer_src.read_text()
+    if marker in html:
+        html = html.replace(marker, embedded, 1)
+    viewer_dst.write_text(html)
+    return viewer_dst
+
+
 # ---- lifecycle context -------------------------------------------------------
 class RunContext:
     """Track which user-side mutations this benchmark run performed so the
@@ -403,8 +420,9 @@ def main():
         }
         out_file = run_dir / "results.json"
         out_file.write_text(json.dumps(results, indent=2))
+        run_viewer = _write_run_viewer(ROOT, run_dir, results)
         log(f"Wrote {out_file}")
-        log(f"View: open {ROOT / 'viewer.html'} and load this results.json")
+        log(f"View: open {run_viewer}")
 
         print("\n=== Summary ===")
         print(f"{'combo':<32} {'wall_med':>10} {'ttft_mean':>10} {'tok/s':>8} {'stream':>7} {'html?':>6} {'btns?':>6}")

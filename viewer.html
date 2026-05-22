@@ -169,6 +169,7 @@
 <div id="err" class="err"></div>
 <main id="report" class="hidden"></main>
 
+<script id="embedded-results-json" type="application/json"></script>
 <script>
 const FIELD_DOCS = {
   agent:   "The CLI/agent under test (e.g. pi, opencode). Each agent has its own startup cost, system prompt, and tool-call overhead — that's what we're trying to measure.",
@@ -217,16 +218,32 @@ dz.addEventListener('drop', e => {
   loadFiles(e.dataTransfer.files);
 });
 
+function addResultSet(data, filename = 'results.json') {
+  const id = state.nextId++;
+  const color = PALETTE[(id - 1) % PALETTE.length];
+  const label = labelFor(filename, data);
+  state.sets.push({ id, label, color, data, filename });
+}
+
+function loadEmbeddedResults() {
+  const el = document.getElementById('embedded-results-json');
+  const text = el ? el.textContent.trim() : '';
+  if (!text) return;
+  try {
+    addResultSet(JSON.parse(text), 'results.json');
+    renderAll();
+  } catch (e) {
+    errEl.textContent = `Failed to load embedded results.json: ${e.message}`;
+  }
+}
+
 async function loadFiles(fileList) {
   errEl.textContent = '';
   for (const file of Array.from(fileList || [])) {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const id = state.nextId++;
-      const color = PALETTE[(id - 1) % PALETTE.length];
-      const label = labelFor(file.name, data);
-      state.sets.push({ id, label, color, data, filename: file.name });
+      addResultSet(data, file.name);
     } catch (e) {
       errEl.textContent += (errEl.textContent ? '\n' : '') + `Failed to parse ${file.name}: ${e.message}`;
     }
@@ -719,6 +736,8 @@ function render(data) {
     });
   });
 }
+
+loadEmbeddedResults();
 </script>
 </body>
 </html>
