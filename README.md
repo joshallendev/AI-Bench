@@ -6,7 +6,7 @@ Supported backends: **Ollama**, **LM Studio**, **oMLX** (Apple Silicon MLX infer
 
 Supported agents: **pi**, **opencode**, **direct** (raw HTTP, no agent wrapper).
 
-For any matrix of `agents × backends × models`, `bench.py` runs the same prompt N times per combination, captures wall time, time-to-first-token, output tokens, and the raw model output, then writes a `results.json` and a per-iteration text file you can open to verify the model actually did the task.
+For any matrix of `agents × backends × models`, `ai-bench` runs the same prompt N times per combination, captures wall time, time-to-first-token, output tokens, and the raw model output, then writes a `results.json` and a per-iteration text file you can open to verify the model actually did the task.
 
 A standalone `viewer.html` reads any `results.json` and renders a sortable, color-coded report with column tooltips and bar charts.
 
@@ -29,12 +29,12 @@ Each iteration's full stdout is saved to disk so you can open the generated arti
 
 ## Prerequisites
 
-These must be present before running `bench.py`. The script does **not** install them.
+These must be present before running `ai-bench`. The script does **not** install them.
 
 | Prerequisite | Why needed | Install |
 |---|---|---|
 | **macOS** (Apple Silicon for full matrix) | Linux supports Ollama only; LM Studio and oMLX require Apple Silicon | — |
-| **Python 3.9+** | Runs `bench.py` | Ships with macOS; or `brew install python` |
+| **Python 3.9+** | Runs `ai-bench` | Ships with macOS; or `brew install python` |
 | **Homebrew** | Installs `ollama`, `lm-studio`, `fzf` | [brew.sh](https://brew.sh) |
 | **Node.js 18+ / npm** | Installs the `pi` coding agent | `brew install node` |
 | **git** | Clones the oMLX source repo | Ships with Xcode CLT; or `brew install git` |
@@ -42,7 +42,7 @@ These must be present before running `bench.py`. The script does **not** install
 
 ## What the script installs
 
-`bench.py` auto-installs the following and tracks them in `.bench-state.json`. Running `python3 bench.py --cleanup-only` removes everything **this script installed or downloaded** — anything you had set up beforehand (Ollama already present, models you pulled by hand, etc.) is left alone.
+`ai-bench` auto-installs the following and tracks them in `.bench-state.json` in the current working directory. Running `ai-bench --cleanup-only` removes everything **this script installed or downloaded** — anything you had set up beforehand (Ollama already present, models you pulled by hand, etc.) is left alone.
 
 | Tool | How installed |
 |---|---|
@@ -59,7 +59,8 @@ These must be present before running `bench.py`. The script does **not** install
 ```bash
 git clone https://github.com/burghr/AI-Bench.git
 cd AI-Bench
-python3 bench.py
+python3 -m pip install -e .
+ai-bench
 ```
 
 On first run the script installs missing tools, opens the interactive model picker, then runs the benchmark. Subsequent runs offer to reuse the last config so you can skip straight to running.
@@ -67,25 +68,25 @@ On first run the script installs missing tools, opens the interactive model pick
 Skip auto-install if everything is already present:
 
 ```bash
-python3 bench.py --skip-install
+ai-bench --skip-install
 ```
 
 Force the model picker open even if a saved config exists:
 
 ```bash
-python3 bench.py --configure
+ai-bench --configure
 ```
 
 Pin a specific config file (bypasses the picker entirely):
 
 ```bash
-python3 bench.py --config bench.config.json
+ai-bench --config bench.config.json
 ```
 
 Uninstall everything the script added:
 
 ```bash
-python3 bench.py --cleanup-only
+ai-bench --cleanup-only
 ```
 
 ## Interactive model picker
@@ -172,7 +173,7 @@ Or export it in your shell before running:
 
 ```bash
 export HF_TOKEN=hf_...
-python3 bench.py
+ai-bench
 ```
 
 ## The viewer
@@ -192,7 +193,7 @@ The viewer is fully static — no server, no dependencies, just open the file. I
 
 ## Adding a new agent
 
-Each agent declares its CLI invocation and supported backends in the `AGENTS` dict in `bench.py`:
+Each agent declares its CLI invocation and supported backends in the `AGENTS` dict in `ai_bench/cli.py`:
 
 ```python
 def _myagent_cmd(model_alias, backend, prompt):
@@ -232,10 +233,17 @@ Then add `"myagent"` to `agents` in the config (or pick it in the interactive pi
 
 ```
 AI-Bench/
-├── bench.py              # main script: matrix runner, agent registry, picker, install/cleanup
+├── ai_bench/
+│   ├── cli.py            # benchmark CLI: matrix runner, agent registry, picker, install/cleanup
+│   ├── web_cli.py        # `ai-bench-web` entry point
+│   ├── web_*.py          # web controller, server, process, result helpers
+│   └── static/           # packaged web UI assets
+├── bench.py              # compatibility wrapper for `ai-bench`
+├── bench-web.py          # compatibility wrapper for `ai-bench-web`
 ├── bench.config.json     # saved config (written by picker or edited manually)
 ├── bench.config.full.json  # example multi-model, multi-backend config
 ├── viewer.html           # static results viewer (no server needed)
+├── pyproject.toml        # package metadata and console scripts
 └── README.md
 
 ~/ai-bench/results/<timestamp>/   # per-run output (home dir, not repo)

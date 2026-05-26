@@ -8,6 +8,7 @@ setting up your benchmark configuration step by step.
 
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
@@ -121,7 +122,7 @@ def load_config() -> dict:
     """Load existing config or return default."""
     if DEFAULT_CONFIG_PATH.exists():
         return json.loads(DEFAULT_CONFIG_PATH.read_text())
-    return DEFAULT_CONFIG.copy()
+    return deepcopy(DEFAULT_CONFIG)
 
 
 def save_config(config: dict) -> None:
@@ -498,12 +499,12 @@ def main():
                 save_config(config)
                 print_status("Running benchmark...")
                 import subprocess
-                subprocess.run([sys.executable, str(ROOT / "bench.py"), "--skip-install"], cwd=str(ROOT))
+                subprocess.run([sys.executable, "-m", "ai_bench.cli", "--skip-install"], cwd=str(ROOT))
                 print_status("Benchmark complete!")
             break
         elif choice == "8":
             if input("Reset to defaults? (y/n): ").strip().lower() == "y":
-                config = DEFAULT_CONFIG.copy()
+                config = deepcopy(DEFAULT_CONFIG)
                 print_status("Reset to defaults")
         elif choice == "9":
             print("Cancelled")

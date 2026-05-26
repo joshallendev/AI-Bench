@@ -224,7 +224,7 @@ async function loadFiles(fileList) {
 }
 
 function labelFor(filename, data) {
-  // Prefer the precise CPU brand string when bench.py provided it.
+  // Prefer the precise CPU brand string when ai-bench provided it.
   // Falls back to arch family if running on an older results.json.
   const ts = data.timestamp || '';
   const plat = data.platform || '';

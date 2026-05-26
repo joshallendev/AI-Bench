@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Bench</title>
+<style>
+:root {
+  --bg: #f8f5ee;
+  --panel: #ffffff;
+  --panel-2: #f1ebe0;
+  --panel-3: #e8e0d0;
+  --line: #ddd5c4;
+  --line-2: #c4b9a8;
+  --text: #1a1612;
+  --muted: #5c5248;
+  --faint: #9e9080;
+  --accent: #d95d04;
+  --accent-soft: rgba(217, 93, 4, 0.10);
+  --good: #3a6e4e;
+  --good-soft: rgba(58, 110, 78, 0.10);
+  --warn: #d95d04;
+  --warn-soft: rgba(217, 93, 4, 0.12);
+  --bad: #b83232;
+  --bad-soft: rgba(184, 50, 50, 0.10);
+  --unknown: #8a7d70;
+  --unknown-soft: rgba(158, 144, 128, 0.14);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+  --shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+body.dark {
+  --bg: #111418;
+  --panel: #1e1e1e;
+  --panel-2: #1a1a1a;
+  --panel-3: #242424;
+  --line: #2d2d2d;
+  --line-2: #424242;
+  --text: #f0edea;
+  --muted: #9c9c9c;
+  --faint: #5a5a5a;
+  --accent: #e36b14;
+  --accent-soft: rgba(217, 93, 4, 0.18);
+  --good: #77b58a;
+  --good-soft: rgba(58, 110, 78, 0.26);
+  --warn: #e36b14;
+  --warn-soft: rgba(217, 93, 4, 0.18);
+  --bad: #e06666;
+  --bad-soft: rgba(184, 50, 50, 0.18);
+  --unknown: #9c9c9c;
+  --unknown-soft: rgba(156, 156, 156, 0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+button, input, textarea { font: inherit; }
+button:not(:disabled),
+[role="button"],
+.run-row,
+.run-check,
+.sortable,
+.card-action,
+.check-item,
+.form-toggle-row {
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sortable {
+  white-space: nowrap;
+}
+.sortable::after {
+  color: var(--muted);
+  content: "↕";
+  display: inline-block;
+  font-size: 10px;
+  margin-left: 6px;
+  opacity: .65;
+}
+.sortable.sort-asc::after {
+  color: var(--accent);
+  content: "↑";
+  opacity: 1;
+}
+.sortable.sort-desc::after {
+  color: var(--accent);
+  content: "↓";
+  opacity: 1;
+}
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-width: 0;
+}
+.brand {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.brand-name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.brand-name em { color: var(--accent); font-style: normal; }
+.brand-sub {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.btn-dark {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.btn-dark:hover { color: var(--text); border-color: var(--line-2); }
+
+.sidebar-nav {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+}
+.nav-item {
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  user-select: none;
+}
+.nav-item:hover { background: var(--panel-2); color: var(--text); }
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.nav-icon { width: 15px; height: 15px; flex: 0 0 auto; }
+
+.history {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 10px;
+}
+.history-head {
+  padding: 0 6px 8px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.history-label {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.btn-clear-history {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+}
+.btn-clear-history:hover:not(:disabled) {
+  border-color: var(--bad);
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.btn-clear-history:disabled {
+  opacity: 0.42;
+}
+.run-empty {
+  margin: 4px 4px 0;
+  padding: 14px 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  color: var(--muted);
+}
+.run-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.run-row:hover { background: var(--panel-2); }
+.run-row.active { background: var(--accent-soft); }
+.run-row.active .run-row-name { color: var(--accent); font-weight: 700; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.dot.done { background: var(--good); }
+.dot.live { background: var(--warn); animation: blink 1.2s ease-in-out infinite; }
+.dot.failed { background: var(--bad); }
+.dot.cancelled { background: transparent; border: 1.5px solid var(--faint); }
+@keyframes blink { 50% { opacity: 0.25; } }
+.run-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.run-row-age {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.run-del {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--bad);
+  display: none;
+}
+.run-row:hover .run-del { display: inline-flex; align-items: center; justify-content: center; }
+.run-row:hover .run-row-age { visibility: hidden; }
+.run-check { display: none; width: 15px; height: 15px; accent-color: var(--accent); }
+.sidebar.compare-mode .run-check { display: block; }
+.sidebar.compare-mode .dot { display: none; }
+.sidebar.compare-mode .run-del { display: none !important; }
+
+.sidebar-foot {
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+.btn-compare-cta {
+  display: none;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 700;
+}
+.btn-compare-cta.visible { display: block; }
+.btn-compare-cta.ready { color: var(--accent); border-color: var(--accent); }
+.btn-compare-cta:disabled { opacity: 0.55; cursor: default; }
+
+.main {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+}
+.topbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 22px;
+}
+.topbar-idle-row,
+.live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.topbar-title,
+.live-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+.topbar-meta,
+.live-panel-sub,
+.section-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.btn-new,
+.btn-topbar,
+.btn-stop,
+.btn-redetect,
+.btn-cancel,
+.btn-start,
+.mini-btn,
+.btn-harness-action {
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  padding: 6px 11px;
+  font-weight: 700;
+}
+.btn-new,
+.btn-start {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-new.stop,
+.btn-stop:hover {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+.btn-topbar:hover,
+.btn-redetect:hover,
+.btn-harness-action:hover,
+.mini-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.topbar-live { display: none; }
+.topbar.is-live .topbar-idle { display: none; }
+.topbar.is-live .topbar-live { display: block; }
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid rgba(180, 83, 9, 0.25);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.progress-wrap {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+.progress-track { height: 6px; background: var(--panel-3); border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: inherit; transition: width 0.25s ease; }
+.progress-count,
+.progress-agent {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.stat-item {
+  padding: 14px 22px;
+  border-right: 1px solid var(--line);
+}
+.stat-item:last-child { border-right: none; }
+.stat-num {
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 800;
+}
+.stat-num.sage { color: var(--good); }
+.unit { color: var(--faint); font-size: 12px; font-weight: 500; }
+.stat-label {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.view { min-height: 0; overflow-y: auto; display: none; }
+.view.active { display: block; }
+.content,
+.config-content,
+.compare-content,
+.live-content {
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-title { font-size: 13px; font-weight: 800; }
+
+.matrix-wrap,
+.card,
+.config-card,
+.live-panel,
+.compare-table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.matrix-top {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+.matrix-top-label { color: var(--muted); }
+.matrix-top-right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.legend { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.08); }
+.seg-control {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.seg-btn {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 4px 10px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.seg-btn.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(15,23,42,0.08); }
+.matrix-scroll { overflow-x: auto; }
+.matrix-grid {
+  display: grid;
+  gap: 6px;
+  min-width: 560px;
+  padding: 14px;
+}
+.matrix-col-head {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.matrix-row-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cell {
+  min-height: 74px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 8px;
+  cursor: pointer;
+}
+.cell:hover { border-color: var(--line-2); }
+.cell.best { border-color: rgba(22,128,60,0.35); }
+.cell.t1 { background: #d0ead9; }
+.cell.t2 { background: #dff0e5; }
+.cell.t3 { background: #f5f0e2; }
+.cell.t4 { background: #f0e6d6; }
+.cell.t5 { background: #e8d9cc; }
+body.dark .cell.t1 { background: rgba(58,110,78,0.30); }
+body.dark .cell.t2 { background: rgba(58,110,78,0.20); }
+body.dark .cell.t3 { background: rgba(245,240,226,0.05); }
+body.dark .cell.t4 { background: rgba(217,93,4,0.12); }
+body.dark .cell.t5 { background: rgba(217,93,4,0.20); }
+.cell-num { font-family: var(--mono); font-size: 18px; font-weight: 800; }
+.cell-unit,
+.cell-sub { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.cell.pending { cursor: default; background: var(--panel-2); }
+.cell.pending .cell-num,
+.cell.pending .cell-unit,
+.cell.pending .cell-sub { visibility: hidden; }
+
+.lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 14px;
+}
+.card-head,
+.config-card-head,
+.live-panel-head {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.card-title,
+.config-card-title,
+.live-panel-title { font-weight: 800; }
+.card-action {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 800;
+}
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+thead th {
+  padding: 8px 12px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  white-space: nowrap;
+}
+thead th.r,
+td.r { text-align: right; }
+tbody tr { border-top: 1px solid var(--line); }
+tbody tr:hover td { background: var(--panel-2); }
+tbody td { padding: 9px 12px; }
+td.num,
+.agent-name,
+.rank,
+.bar-val { font-family: var(--mono); }
+.bar-cell { display: flex; align-items: center; gap: 8px; }
+.bar-track { flex: 1; min-width: 48px; height: 4px; background: var(--panel-3); border-radius: 999px; }
+.bar-fill { height: 100%; background: var(--good); border-radius: inherit; }
+.bar-val { min-width: 36px; text-align: right; color: var(--muted); }
+.prompt-body {
+  padding: 14px;
+  min-height: 156px;
+  color: var(--muted);
+  background: var(--panel-2);
+  font-family: var(--mono);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.prompt-foot {
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.raw-output-card { overflow: hidden; }
+.raw-output-toolbar {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.raw-output-select {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 4px 8px;
+}
+.raw-output-meta {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.raw-output-body {
+  min-height: 220px;
+  max-height: 440px;
+  overflow: auto;
+  padding: 14px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.live-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.live-summary-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+.live-summary-value {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 800;
+}
+.live-summary-value.sage { color: var(--good); }
+.live-summary-value.orange { color: var(--warn); }
+.live-summary-value.red { color: var(--bad); }
+.live-summary-label { color: var(--muted); }
+.live-test-row {
+  display: grid;
+  grid-template-columns: 36px 92px minmax(0, 1fr) 88px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+.live-test-row.running { background: var(--warn-soft); }
+.live-test-row.complete { background: var(--good-soft); }
+.live-test-row.failed,
+.live-test-row.empty { background: var(--bad-soft); }
+.live-test-row.unknown { background: var(--unknown-soft); }
+.live-test-index {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+}
+.live-test-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  text-align: center;
+}
+.live-test-row.running .live-test-status { color: var(--warn); background: var(--warn-soft); }
+.live-test-row.complete .live-test-status { color: var(--good); background: var(--good-soft); }
+.live-test-row.failed .live-test-status,
+.live-test-row.empty .live-test-status { color: var(--bad); background: var(--bad-soft); }
+.live-test-row.unknown .live-test-status { color: var(--unknown); background: var(--unknown-soft); }
+.live-test-name,
+.live-test-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.live-test-meta { text-align: right; color: var(--muted); font-size: 11px; }
+.live-empty {
+  padding: 28px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+.live-log-card { overflow: hidden; }
+.live-log-body {
+  height: 260px;
+  overflow: auto;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.live-log-line {
+  display: grid;
+  grid-template-columns: 62px 48px minmax(0, 1fr);
+  gap: 10px;
+  padding: 2px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.live-log-time,
+.live-log-stream {
+  color: var(--faint);
+}
+.live-log-time {
+  font-variant-numeric: tabular-nums;
+}
+.live-log-stream {
+  text-transform: uppercase;
+}
+.live-log-line.stderr .live-log-stream { color: var(--bad); }
+.live-log-empty {
+  color: var(--muted);
+}
+
+.config-content { grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr); align-items: start; }
+.harness-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+.harness-row:first-child { border-top: 0; }
+.harness-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+.harness-name { font-weight: 800; }
+.harness-desc,
+.harness-stext,
+.install-hint { color: var(--muted); }
+.harness-status-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.harness-sdot { width: 7px; height: 7px; border-radius: 50%; }
+.harness-stext { font-family: var(--mono); font-size: 12px; }
+.harness-stext.ok { color: var(--good); }
+.harness-stext.scanning { color: var(--warn); }
+.install-drawer { display: none; padding: 12px 14px 14px 58px; border-top: 1px solid var(--line); background: var(--panel-2); }
+.install-drawer.open { display: block; }
+.install-drawer-title { font-weight: 800; margin-bottom: 8px; }
+.install-cmd-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.install-cmd {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.btn-copy {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 800;
+}
+.defaults-grid {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+.form-field,
+.modal-input-field {
+  display: grid;
+  gap: 5px;
+}
+.form-label,
+.modal-input-label,
+.modal-col-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.form-input,
+.modal-input,
+.model-search-input,
+.modal-prompt-area {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 8px 10px;
+}
+.form-input,
+.modal-input { width: 88px; }
+.form-toggle-row { display: flex; align-items: center; gap: 9px; }
+.form-checkbox { width: 15px; height: 15px; accent-color: var(--accent); }
+
+.compare-empty {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
+}
+.compare-empty-title { color: var(--text); font-weight: 800; margin: 8px 0 4px; }
+.compare-empty-body { max-width: 360px; }
+.compare-arrow { font-size: 30px; color: var(--faint); }
+.compare-toolbar { margin-bottom: 10px; }
+.compare-toolbar-title { font-weight: 800; }
+.compare-toolbar-sub { color: var(--muted); margin-left: 8px; }
+.ctable th,
+.ctable td { padding: 9px 12px; }
+.ctable th.ch-run,
+.ctable .td-val,
+.ctable .td-wins-val { text-align: right; border-left: 1px solid var(--line); }
+.ctable .tr-group td {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.ctable .td-agent { color: var(--muted); font-family: var(--mono); }
+.td-val.is-best,
+.td-wins-val.is-most,
+.ch-run.is-winner .rh-name { color: var(--good); font-weight: 800; }
+.rh-name,
+.rh-meta { display: block; }
+.rh-meta { color: var(--muted); font-weight: 500; font-size: 11px; }
+.rh-badge {
+  display: inline-block;
+  margin-top: 4px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.50);
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  width: min(900px, calc(100vw - 40px));
+  max-height: min(780px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.modal-head,
+.modal-foot {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.modal-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; background: var(--panel-2); }
+.modal-title { font-size: 16px; font-weight: 800; }
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+}
+.modal-close:hover { background: var(--panel-2); color: var(--text); }
+.modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: grid;
+  gap: 16px;
+}
+.modal-two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.model-picker-section { margin-bottom: 14px; }
+.model-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; }
+.check-list { display: grid; gap: 4px; }
+.check-item {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.check-item:hover { background: var(--panel-2); }
+.check-item input { width: 15px; height: 15px; accent-color: var(--accent); }
+.check-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.check-item-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.check-item-badge.ok { color: var(--good); background: var(--good-soft); }
+.check-item-badge.warn { color: var(--warn); background: var(--warn-soft); }
+.check-item-badge.off { color: var(--muted); background: var(--panel-2); }
+.check-item.disabled { opacity: 0.55; pointer-events: none; }
+.modal-inputs-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.modal-prompt-area {
+  width: 100%;
+  min-height: 112px;
+  max-height: 220px;
+  resize: vertical;
+  line-height: 1.55;
+  font-family: var(--mono);
+}
+.popover {
+  position: fixed;
+  z-index: 30;
+  display: none;
+  min-width: 220px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+.popover.visible { display: block; }
+.popover-header { font-weight: 800; font-family: var(--mono); padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.popover-iter,
+.popover-avg { display: grid; grid-template-columns: 44px 1fr 1fr; gap: 4px 8px; font-family: var(--mono); font-size: 11px; }
+.popover-val,
+.popover-avg-val { text-align: right; }
+.popover-divider { height: 1px; background: var(--line); margin: 8px 0; }
+
+.bottom-nav { display: none; }
+@media (max-width: 900px) {
+  body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .sidebar { display: none; }
+  .main { min-height: 0; }
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
+  .bottom-nav .nav-item {
+    justify-content: center;
+    border-radius: 0;
+    min-height: 52px;
+  }
+  .topbar-idle-row,
+  .matrix-top,
+  .live-header {
+    align-items: stretch;
+    flex-direction: column;
+    display: flex;
+  }
+  .topbar-actions { justify-content: flex-start; }
+  .stat-strip,
+  .live-summary-grid,
+  .lower,
+  .config-content,
+  .modal-two-col {
+    grid-template-columns: 1fr;
+  }
+  .stat-item { border-right: 0; border-top: 1px solid var(--line); }
+  .stat-item:first-child { border-top: 0; }
+  .content,
+  .config-content,
+  .compare-content,
+  .live-content { padding: 16px; }
+  .modal-overlay { padding: 10px; align-items: stretch; }
+  .modal { width: 100%; max-height: calc(100vh - 20px); }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar" id="sidebar" aria-label="Primary">
+  <div class="brand">
+    <div class="brand-top">
+      <div class="brand-name">ai<em>bench</em></div>
+      <button class="btn-dark" id="btn-dark" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">☀</button>
+    </div>
+    <div class="brand-sub">Local benchmark controller</div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')" role="button" tabindex="0">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1.2"/><rect x="8" y="1" width="5" height="5" rx="1.2"/><rect x="1" y="8" width="5" height="5" rx="1.2"/><rect x="8" y="8" width="5" height="5" rx="1.2"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" data-view="configure" onclick="switchView('configure')" role="button" tabindex="0">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="4" x2="12" y2="4"/><circle cx="5" cy="4" r="1.5" fill="currentColor" stroke="none"/><line x1="2" y1="10" x2="12" y2="10"/><circle cx="9" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>
+      Configure
+    </div>
+    <div class="nav-item" data-view="compare" onclick="switchView('compare')" role="button" tabindex="0">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="12" rx="1.2"/><rect x="8" y="1" width="5" height="12" rx="1.2"/></svg>
+      Compare
+    </div>
+  </div>
+
+  <div class="history">
+    <div class="history-head">
+      <div class="history-label">Run History</div>
+      <button class="btn-clear-history" id="btn-clear-history" onclick="clearRunHistory()" title="Delete completed run history">Clear all</button>
+    </div>
+  </div>
+
+  <div class="sidebar-foot">
+    <button class="btn-compare-cta" id="btn-compare-cta" onclick="runCompare()">Select runs to compare</button>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="topbar" id="topbar">
+    <div class="topbar-idle">
+      <div class="topbar-idle-row">
+        <div>
+          <div class="topbar-title" id="topbar-title">No run selected</div>
+          <div class="topbar-meta" id="topbar-meta">Start a benchmark or select a previous run from history.</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn-new" id="btn-new" onclick="openNewRunModal()">New Benchmark</button>
+          <button class="btn-topbar" onclick="window.exportSelectedRun()">Export</button>
+          <button class="btn-topbar" onclick="window.reRunSelected()">Re-run</button>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-live">
+      <div class="live-header">
+        <div class="live-title"><span id="live-run-name">Benchmark run</span> <span class="live-badge">Live</span></div>
+        <button class="btn-stop live-stop-action" onclick="stopLive()">Stop run</button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <span class="progress-count" id="progress-count">0 / 0</span>
+        <span class="progress-agent" id="progress-agent">Waiting</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-strip" id="stat-strip"></div>
+
+  <section class="view active" id="view-dashboard">
+    <div class="content">
+      <section>
+        <div class="section-head">
+          <span class="section-title">Performance Matrix</span>
+          <span class="section-sub" id="matrix-label">Eval throughput · raw backend generation speed</span>
+        </div>
+        <div class="matrix-wrap">
+          <div class="matrix-top">
+            <span class="matrix-top-label">Cells compare selected result combos. Use backend-aware run names until backend filtering lands.</span>
+            <div class="matrix-top-right">
+              <div class="legend" aria-label="Performance color scale">
+                <div class="legend-item"><div class="legend-dot" style="background:#d8f2df"></div>Best</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#e5f5eb"></div>High</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f3f4f6"></div>Middle</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f4e7d6"></div>Low</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ecd6ce"></div>Lowest</div>
+              </div>
+              <div class="seg-control">
+                <button class="seg-btn active" data-metric="toks" onclick="switchMetric('toks')">tok/s</button>
+                <button class="seg-btn" data-metric="wall" onclick="switchMetric('wall')">wall time</button>
+              </div>
+            </div>
+          </div>
+          <div class="matrix-scroll"></div>
+        </div>
+      </section>
+
+      <div class="lower">
+        <section>
+          <div class="section-head">
+            <span class="section-title">Combo Results</span>
+            <span class="section-sub">Sortable per model · agent · backend result rows</span>
+          </div>
+          <div class="card">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:32px">#</th>
+                  <th class="sortable" data-col="agent" onclick="sortBy('agent')" aria-sort="none">Agent</th>
+                  <th class="r sortable" data-col="wall" onclick="sortBy('wall')" aria-sort="none">Wall</th>
+                  <th class="sortable sort-desc" data-col="toks" onclick="sortBy('toks')" aria-sort="descending">tok/s</th>
+                  <th class="r sortable" data-col="ttft" onclick="sortBy('ttft')" aria-sort="none">TTFT</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <span class="section-title">Benchmark Prompt</span>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Task</span>
+              <button class="card-action" onclick="window.reRunSelected()">Use as template</button>
+            </div>
+            <div class="prompt-body"></div>
+            <div class="prompt-foot"></div>
+          </div>
+        </section>
+      </div>
+      <section>
+        <div class="section-head">
+          <span class="section-title">Raw Output</span>
+          <span class="section-sub">Captured text from completed iterations</span>
+        </div>
+        <div class="card raw-output-card">
+          <div class="raw-output-toolbar">
+            <select class="raw-output-select" id="raw-output-select" onchange="window.selectRawOutput(this.value)"></select>
+            <span class="raw-output-meta" id="raw-output-meta"></span>
+          </div>
+          <pre class="raw-output-body" id="raw-output-body">Select a completed run to view raw output.</pre>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="view" id="view-live">
+    <div class="live-content">
+      <div class="section-head">
+        <span class="section-title">Live Run</span>
+        <span class="section-sub" id="live-view-sub">Waiting for benchmark events</span>
+      </div>
+      <div class="live-panel live-log-card">
+        <div class="live-panel-head">
+          <div>
+            <div class="live-panel-title">CLI Output</div>
+            <div class="live-panel-sub">Streaming benchmark stdout and stderr</div>
+          </div>
+          <span class="live-panel-sub" id="live-log-count"></span>
+        </div>
+        <div class="live-log-body" id="live-log-body"><div class="live-log-empty">CLI output will stream here while the benchmark runs.</div></div>
+      </div>
+      <div class="live-summary-grid">
+        <div class="live-summary-card"><div class="live-summary-value sage" id="live-summary-done">0</div><div class="live-summary-label">completed</div></div>
+        <div class="live-summary-card"><div class="live-summary-value red" id="live-summary-issues">0</div><div class="live-summary-label">issues</div></div>
+        <div class="live-summary-card"><div class="live-summary-value orange" id="live-summary-running">0</div><div class="live-summary-label">running</div></div>
+        <div class="live-summary-card"><div class="live-summary-value" id="live-summary-pending">0</div><div class="live-summary-label">queued</div></div>
+      </div>
+      <div class="live-panel">
+        <div class="live-panel-head">
+          <div>
+            <div class="live-panel-title" id="live-detail-title">No active run</div>
+            <div class="live-panel-sub" id="live-detail-sub">Start a benchmark to see live progress here.</div>
+          </div>
+          <button class="btn-stop live-stop-action" id="live-panel-stop" onclick="stopLive()">Stop run</button>
+        </div>
+        <div class="live-test-list" id="live-test-list"><div class="live-empty">No live run is active.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-configure">
+    <div class="config-content">
+      <section>
+        <div class="section-head">
+          <span class="section-title">Local Capability Check</span>
+          <span class="section-sub">Agents and backends detected on this machine</span>
+        </div>
+        <div class="config-card">
+          <div class="config-card-head">
+            <span class="config-card-title">Installed and available</span>
+            <button class="btn-redetect" id="btn-redetect" onclick="redetectAll()">Re-detect all</button>
+          </div>
+          <div id="harness-list"></div>
+        </div>
+      </section>
+      <section>
+        <div class="section-head">
+          <span class="section-title">Run Defaults</span>
+          <span class="section-sub">Used when opening the new benchmark flow</span>
+        </div>
+        <div class="config-card">
+          <div class="defaults-grid">
+            <div class="form-field">
+              <label class="form-label" for="inp-iters">Default iterations</label>
+              <input class="form-input" id="inp-iters" type="number" value="3" min="1" max="20">
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="inp-warmup">Warmup runs</label>
+              <input class="form-input" id="inp-warmup" type="number" value="1" min="0" max="5">
+            </div>
+            <div class="form-toggle-row">
+              <input type="checkbox" class="form-checkbox" id="chk-autoscan" checked>
+              <label class="form-toggle-label" for="chk-autoscan">Auto-detect local models on launch</label>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="view" id="view-compare">
+    <div class="compare-content" id="compare-content">
+      <div class="compare-empty" id="compare-empty">
+        <div>
+          <div class="compare-arrow">⇄</div>
+          <div class="compare-empty-title">Select runs to compare</div>
+          <div class="compare-empty-body">Choose two or more runs from history, then compare throughput row by row. Missing results are shown as unavailable, not zero.</div>
+        </div>
+      </div>
+      <div id="compare-results" style="display:none"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')" role="button" tabindex="0">Dashboard</div>
+  <div class="nav-item" data-view="configure" onclick="switchView('configure')" role="button" tabindex="0">Configure</div>
+  <div class="nav-item" data-view="compare" onclick="switchView('compare')" role="button" tabindex="0">Compare</div>
+</nav>
+
+<div class="modal-overlay" id="modal-overlay" onclick="overlayClick(event)">
+  <div class="modal" id="run-modal" role="dialog" aria-modal="true" aria-labelledby="new-run-title">
+    <div class="modal-head">
+      <span class="modal-title" id="new-run-title">New Benchmark</span>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="section-title">What exactly will run?</div>
+        <div class="section-sub">Select models and harnesses, then review preflight warnings before the benchmark starts.</div>
+      </div>
+      <div class="modal-two-col">
+        <div>
+          <div class="modal-col-label">Models</div>
+          <div class="check-list">
+            <label class="check-item"><input type="checkbox" checked><span class="check-item-label">Loading local models...</span><span class="check-item-badge">local</span></label>
+          </div>
+        </div>
+        <div>
+          <div class="modal-col-label">Agents</div>
+          <div class="check-list" id="modal-harness-list"></div>
+        </div>
+      </div>
+      <div class="modal-inputs-row">
+        <div class="modal-input-field">
+          <label class="modal-input-label" for="mi-iters">Iterations</label>
+          <input class="modal-input" id="mi-iters" type="number" value="3" min="1" max="20">
+        </div>
+        <div class="modal-input-field">
+          <label class="modal-input-label" for="mi-warmup">Warmup runs</label>
+          <input class="modal-input" id="mi-warmup" type="number" value="1" min="0" max="5">
+        </div>
+      </div>
+      <div>
+        <div class="modal-col-label">Benchmark Prompt</div>
+        <textarea class="modal-prompt-area" id="modal-prompt" rows="4"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-start" id="btn-start" onclick="startBenchmark()">Start Benchmark</button>
+    </div>
+  </div>
+</div>
+
+<div class="popover" id="cell-popover"></div>
+<script src="bench-web-ui.js"></script>
+</body>
+</html>

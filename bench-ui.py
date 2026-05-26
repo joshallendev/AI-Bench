@@ -8,6 +8,7 @@ Interactive terminal interface for configuring and running AI-Bench benchmarks.
 import json
 import curses
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
@@ -76,20 +77,24 @@ class Config:
     iterations: int = 1
     warmup: int = 0
     prompt: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Config":
+        return cls(
+            models=deepcopy(data.get("models", [])),
+            agents=deepcopy(data.get("agents", [])),
+            backends=deepcopy(data.get("backends", [])),
+            iterations=data.get("iterations", 1),
+            warmup=data.get("warmup", 0),
+            prompt=data.get("prompt", "")
+        )
     
     @classmethod
     def load(cls, path: Path) -> "Config":
         if path.exists():
             data = json.loads(path.read_text())
-            return cls(
-                models=data.get("models", []),
-                agents=data.get("agents", []),
-                backends=data.get("backends", []),
-                iterations=data.get("iterations", 1),
-                warmup=data.get("warmup", 0),
-                prompt=data.get("prompt", "")
-            )
-        return cls()
+            return cls.from_dict(data)
+        return cls.from_dict(DEFAULT_CONFIG)
     
     def save(self, path: Path) -> None:
         data = {
@@ -119,10 +124,12 @@ class TUI:
         self.available_models = []
         
         # Agent selection state
+        self.selected_agent_idx = 0
         self.available_agents = ["pi", "opencode"]
         self.agent_indices = {name: i for i, name in enumerate(self.available_agents)}
         
         # Backend selection state
+        self.selected_backend_idx = 0
         self.available_backends = ["ollama", "lmstudio", "omlx"]
         self.backend_indices = {name: i for i, name in enumerate(self.available_backends)}
         
@@ -160,18 +167,26 @@ class TUI:
     
     def handle_key(self, key) -> bool:
         """Handle keyboard input. Returns True if should exit."""
-        if key == ord('q') or key == 27:  # q or ESC
-            return True
-        
         if self.editing_prompt:
             return self.handle_prompt_input(key)
+
+        if key == ord('q') or key == 27:  # q or ESC
+            return True
+
+        if key == ord('s'):
+            return self.save_and_run()
+
+        if key == ord('r'):
+            self.config = Config.from_dict(DEFAULT_CONFIG)
+            self.status_message = "Config reset to defaults"
+            return False
         
         # Tab navigation
-        if key in (ord('\t'), curses.KEY_DOWN):
+        if key == ord('\t'):
             self.tab_index = (self.tab_index + 1) % len(self.tabs)
             return False
         
-        if key == curses.KEY_UP:
+        if key == getattr(curses, "KEY_BTAB", -1):
             self.tab_index = (self.tab_index - 1) % len(self.tabs)
             return False
         
@@ -193,15 +208,6 @@ class TUI:
                 self.prompt_cursor = len(self.config.prompt)
                 self.prompt_offset = 0
             return False
-        
-        if key == ord('s') and not self.editing_prompt:
-            # Save and run
-            return self.save_and_run()
-        
-        if key == ord('r') and not self.editing_prompt:
-            # Reset to default
-            self.config = Config()
-            self.status_message = "Config reset to defaults"
         
         return False
     
@@ -232,11 +238,14 @@ class TUI:
     def handle_agents_key(self, key) -> bool:
         """Handle agent selection keys."""
         if key == curses.KEY_UP:
-            self.selected_model_idx = max(0, self.selected_model_idx - 1)
+            self.selected_agent_idx = max(0, self.selected_agent_idx - 1)
         elif key == curses.KEY_DOWN:
-            self.selected_model_idx = min(len(self.available_agents) - 1, self.selected_model_idx + 1)
+            self.selected_agent_idx = min(len(self.available_agents) - 1, self.selected_agent_idx + 1)
         elif key in (ord('x'), ord(' ')):
-            agent = self.available_agents[self.selected_model_idx]
+            if not self.available_agents:
+                return False
+            self.selected_agent_idx = min(self.selected_agent_idx, len(self.available_agents) - 1)
+            agent = self.available_agents[self.selected_agent_idx]
             if agent in self.config.agents:
                 self.config.agents.remove(agent)
             else:
@@ -247,11 +256,14 @@ class TUI:
     def handle_backends_key(self, key) -> bool:
         """Handle backend selection keys."""
         if key == curses.KEY_UP:
-            self.selected_model_idx = max(0, self.selected_model_idx - 1)
+            self.selected_backend_idx = max(0, self.selected_backend_idx - 1)
         elif key == curses.KEY_DOWN:
-            self.selected_model_idx = min(len(self.available_backends) - 1, self.selected_model_idx + 1)
+            self.selected_backend_idx = min(len(self.available_backends) - 1, self.selected_backend_idx + 1)
         elif key in (ord('x'), ord(' ')):
-            backend = self.available_backends[self.selected_model_idx]
+            if not self.available_backends:
+                return False
+            self.selected_backend_idx = min(self.selected_backend_idx, len(self.available_backends) - 1)
+            backend = self.available_backends[self.selected_backend_idx]
             if backend in self.config.backends:
                 self.config.backends.remove(backend)
             else:
@@ -261,20 +273,20 @@ class TUI:
     
     def handle_iterations_key(self, key) -> bool:
         """Handle iterations input."""
-        if key in (ord('+'), ord('=')):
+        if key in (ord('+'), ord('='), curses.KEY_RIGHT):
             self.config.iterations += 1
             self.status_message = f"Iterations: {self.config.iterations}"
-        elif key == ord('-') and self.config.iterations > 1:
+        elif key in (ord('-'), curses.KEY_LEFT) and self.config.iterations > 1:
             self.config.iterations -= 1
             self.status_message = f"Iterations: {self.config.iterations}"
         return False
     
     def handle_warmup_key(self, key) -> bool:
         """Handle warmup input."""
-        if key in (ord('+'), ord('=')):
+        if key in (ord('+'), ord('='), curses.KEY_RIGHT):
             self.config.warmup += 1
             self.status_message = f"Warmup: {self.config.warmup}"
-        elif key == ord('-') and self.config.warmup > 0:
+        elif key in (ord('-'), curses.KEY_LEFT) and self.config.warmup > 0:
             self.config.warmup -= 1
             self.status_message = f"Warmup: {self.config.warmup}"
         return False
@@ -340,7 +352,7 @@ class TUI:
             
             key = self.stdscr.getch()
             if key in (ord('y'), ord('Y')):
-                # Run bench.py
+                # Run the benchmark CLI
                 self.stdscr.clear()
                 self.stdscr.refresh()
                 curses.nocbreak()
@@ -350,7 +362,7 @@ class TUI:
                 
                 import subprocess
                 result = subprocess.run(
-                    [sys.executable, str(ROOT / "bench.py"), "--skip-install"],
+                    [sys.executable, "-m", "ai_bench.cli", "--skip-install"],
                     cwd=str(ROOT)
                 )
                 
@@ -422,9 +434,9 @@ class TUI:
         if tab == "models":
             self.draw_models(y, w, h)
         elif tab == "agents":
-            self.draw_agents(y, w, h)
+            self.draw_agents(y, w)
         elif tab == "backends":
-            self.draw_backends(y, w, h)
+            self.draw_backends(y, w)
         elif tab == "iterations":
             self.draw_iterations(y, w)
         elif tab == "warmup":
@@ -472,9 +484,9 @@ class TUI:
         for i, agent in enumerate(self.available_agents):
             checked = "✓" if agent in self.config.agents else " "
             x = 4
-            self.stdscr.attron(curses.color_pair(1) if i == self.selected_model_idx else curses.color_pair(4))
+            self.stdscr.attron(curses.color_pair(1) if i == self.selected_agent_idx else curses.color_pair(4))
             self.stdscr.addstr(y + i, x, f"[{checked}] {agent}")
-            self.stdscr.attroff(curses.color_pair(1) if i == self.selected_model_idx else curses.color_pair(4))
+            self.stdscr.attroff(curses.color_pair(1) if i == self.selected_agent_idx else curses.color_pair(4))
         
         # Instructions
         self.stdscr.addstr(y + len(self.available_agents) + 2, 2, "↑↓: Select | Space: Toggle selection")
@@ -487,9 +499,9 @@ class TUI:
         for i, backend in enumerate(self.available_backends):
             checked = "✓" if backend in self.config.backends else " "
             x = 4
-            self.stdscr.attron(curses.color_pair(1) if i == self.selected_model_idx else curses.color_pair(4))
+            self.stdscr.attron(curses.color_pair(1) if i == self.selected_backend_idx else curses.color_pair(4))
             self.stdscr.addstr(y + i, x, f"[{checked}] {backend}")
-            self.stdscr.attroff(curses.color_pair(1) if i == self.selected_model_idx else curses.color_pair(4))
+            self.stdscr.attroff(curses.color_pair(1) if i == self.selected_backend_idx else curses.color_pair(4))
         
         # Instructions
         self.stdscr.addstr(y + len(self.available_backends) + 2, 2, "↑↓: Select | Space: Toggle selection")
@@ -583,9 +595,9 @@ def entry_point():
             config = Config.load(config_path)
             config.save(config_path)  # Ensure it's saved
         else:
-            config = Config()
+            config = Config.from_dict(DEFAULT_CONFIG)
         
-        subprocess.run([sys.executable, str(ROOT / "bench.py")], cwd=str(ROOT))
+        subprocess.run([sys.executable, "-m", "ai_bench.cli"], cwd=str(ROOT))
         return
     
     # Run TUI

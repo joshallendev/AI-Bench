@@ -1,8 +1,16 @@
 .env
 .bench-state.json
+.bench-web/
+.pi/
 results/
 *.log
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+build/
+*.egg-info/
 .DS_Store
+mockups/
+root/
+hello_world/
