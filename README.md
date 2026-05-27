@@ -89,6 +89,46 @@ Uninstall everything the script added:
 ai-bench --cleanup-only
 ```
 
+## Web UI
+
+The web UI runs a local controller for configuring benchmarks, starting runs, watching live progress, and reviewing past results.
+
+Install AI-Bench in editable mode once from the repo root:
+
+```bash
+python3 -m pip install -e .
+```
+
+If you already ran the Quick start install step, you can skip this. Then start the web server:
+
+```bash
+ai-bench-web
+```
+
+Open the printed URL in your browser:
+
+```text
+http://127.0.0.1:8765
+```
+
+Leave the terminal running while you use the UI. Press `Ctrl-C` to stop the server.
+
+If you are running directly from a checkout without installing the console script, use the compatibility wrapper:
+
+```bash
+python3 bench-web.py
+```
+
+Useful options:
+
+```bash
+ai-bench-web --port 9000
+ai-bench-web --root /path/to/AI-Bench
+ai-bench-web --results-dir /path/to/results
+```
+
+By default the server binds only to loopback addresses. To expose it on another interface, pass both `--host` and `--allow-non-loopback`.
+
 ## Interactive model picker
 
 When running interactively without a pinned `--config`, the script opens a **per-backend model picker** before starting the benchmark. It requires no prior config knowledge — just search and select.
